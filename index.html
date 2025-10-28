@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local Library Manager</title>
+    <!-- Load Tailwind CSS for modern styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load Lucide icons for clean UI elements -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Custom CSS Styles -->
+    <style>
+        /* Custom font and base styling */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #e2e8f0; /* Subtle blue-gray background */
+        }
+        /* Custom scrollbar for aesthetics */
+        .book-list::-webkit-scrollbar {
+            width: 8px;
+        }
+        .book-list::-webkit-scrollbar-thumb {
+            background-color: #94a3b8; /* Slate 400 */
+            border-radius: 4px;
+        }
+        .book-list::-webkit-scrollbar-track {
+            background-color: #f1f5f9; /* Slate 100 */
+        }
+        /* Styles for the loading indicator and button spinner */
+        .spinner {
+            border-top-color: #3b82f6;
+            -webkit-animation: spinner 1s linear infinite;
+            animation: spinner 1s linear infinite;
+        }
+        /* Override for button spinner to ensure visibility on button background */
+        button .spinner {
+             border-top-color: white; 
+             border-color: rgba(255, 255, 255, 0.3);
+        }
+        @-webkit-keyframes spinner {
+            0% { -webkit-transform: rotate(0deg); }
+            100% { -webkit-transform: rotate(360deg); }
+        }
+        @keyframes spinner {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="p-4 sm:p-8 min-h-screen">
+
+    <!-- Main Application Container -->
+    <div class="max-w-4xl mx-auto bg-white shadow-2xl rounded-xl p-6 sm:p-10 border border-gray-100">
+
+        <!-- Header -->
+        <header class="mb-6 border-b pb-4">
+            <div class="flex items-center justify-between">
+                <h1 class="text-3xl font-extrabold text-gray-900 flex items-center">
+                    <i data-lucide="book-open-text" class="w-8 h-8 text-blue-600 mr-3"></i>
+                    The Local Library Manager
+                </h1>
+                <p id="user-info" class="text-xs text-gray-500 bg-gray-100 p-2 rounded-lg truncate max-w-[150px] sm:max-w-xs transition-all duration-300 hover:max-w-none">
+                    Status: Running Locally (localStorage)
+                </p>
+            </div>
+            <p class="text-gray-500 mt-1">Manage book copies, issue, and return inventory saved in your browser.</p>
+        </header>
+        
+        <!-- Add New Book Section (Collapsible Form) -->
+        <details class="mb-8 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+            <summary class="font-semibold text-lg text-yellow-700 cursor-pointer flex items-center">
+                <i data-lucide="plus-circle" class="w-5 h-5 mr-2"></i>
+                Add New Book to Inventory
+            </summary>
+            <form id="add-book-form" class="mt-4 space-y-4">
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <input type="text" id="new-title" placeholder="Book Title (e.g., Dune)" required 
+                           class="p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                    <input type="text" id="new-author" placeholder="Author Name" required 
+                           class="p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                    <input type="number" id="new-copies" placeholder="Copies (e.g., 2)" required min="1" value="1"
+                           class="p-3 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500">
+                </div>
+                <button type="submit" id="add-book-btn"
+                        class="w-full py-3 bg-yellow-600 hover:bg-yellow-700 text-white font-bold rounded-lg transition duration-150 focus:outline-none focus:ring-4 focus:ring-yellow-300 flex items-center justify-center">
+                    <i data-lucide="library" class="w-5 h-5 mr-2"></i>
+                    Add to Shelf
+                </button>
+            </form>
+        </details>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="flex justify-center items-center py-12">
+            <div class="spinner border-4 border-solid border-gray-200 border-t-4 border-blue-500 rounded-full w-12 h-12"></div>
+            <p class="ml-4 text-gray-600">Loading library data...</p>
+        </div>
+
+        <!-- Book List Container (Dynamic content added by JS) -->
+        <div id="book-list-container" class="book-list space-y-4 max-h-[70vh] overflow-y-auto hidden">
+            <!-- Book cards will be dynamically inserted here -->
+        </div>
+
+        <!-- Empty State Message -->
+        <div id="empty-state" class="hidden text-center py-16 bg-gray-50 rounded-lg border border-dashed border-gray-300">
+            <i data-lucide="inbox" class="w-10 h-10 mx-auto text-gray-400 mb-3"></i>
+            <h3 class="text-xl font-semibold text-gray-900">No Books Found</h3>
+            <p class="mt-1 text-gray-500">The library is empty. Use the "Add New Book" form above to start your collection.</p>
+        </div>
+
+    </div>
+
+    <!-- JavaScript Logic (using localStorage) -->
+    <script>
+        // --- CORE LOCAL STORAGE SETUP ---
+        const STORAGE_KEY = 'localLibraryInventory';
+        
+        // DOM elements
+        const loadingEl = document.getElementById('loading');
+        const bookListContainer = document.getElementById('book-list-container');
+        const emptyStateEl = document.getElementById('empty-state');
+        const addBookForm = document.getElementById('add-book-form');
+        const addBookBtn = document.getElementById('add-book-btn');
+
+        // Initial book data for seeding
+        const initialBooks = [
+            { id: Date.now().toString() + 'a', title: "To Kill a Mockingbird", author: "Harper Lee", copies: 3 },
+            { id: Date.now().toString() + 'b', title: "1984", author: "George Orwell", copies: 5 },
+            { id: Date.now().toString() + 'c', title: "The Great Gatsby", author: "F. Scott Fitzgerald", copies: 1 },
+            { id: Date.now().toString() + 'd', title: "Pride and Prejudice", author: "Jane Austen", copies: 4 },
+        ];
+
+        // --- LOCAL STORAGE FUNCTIONS ---
+
+        function loadBooks() {
+            try {
+                const data = localStorage.getItem(STORAGE_KEY);
+                return data ? JSON.parse(data) : [];
+            } catch (error) {
+                console.error("Error loading books from localStorage:", error);
+                return [];
+            }
+        }
+
+        function saveBooks(books) {
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(books));
+            } catch (error) {
+                console.error("Error saving books to localStorage:", error);
+            }
+        }
+        
+        function checkAndSeedData() {
+            let books = loadBooks();
+            if (books.length === 0) {
+                // Assign unique IDs based on timestamp for initial books
+                books = initialBooks.map((book, index) => ({
+                    ...book,
+                    id: `seed-${Date.now()}-${index}`
+                }));
+                saveBooks(books);
+            }
+            renderBooks(books);
+        }
+
+        // --- RENDERING LOGIC ---
+        function renderBooks() {
+            const books = loadBooks(); // Load the latest state
+            bookListContainer.innerHTML = ''; // Clear existing list
+            
+            // Hide loading
+            loadingEl.classList.add('hidden');
+
+            if (books.length > 0) {
+                bookListContainer.classList.remove('hidden');
+                emptyStateEl.classList.add('hidden');
+            } else {
+                bookListContainer.classList.add('hidden');
+                emptyStateEl.classList.remove('hidden');
+            }
+            
+            books.forEach(book => {
+                const isAvailable = book.copies > 0;
+                
+                const cardHtml = `
+                    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 sm:p-6 bg-white border border-gray-200 rounded-xl shadow-md transition duration-200 hover:shadow-lg">
+                        
+                        <!-- Book Info -->
+                        <div class="flex-1 min-w-0 mr-4 mb-3 sm:mb-0">
+                            <p class="text-xl font-bold text-gray-800 truncate">${book.title}</p>
+                            <p class="text-sm text-gray-500 mt-1">by <span class="font-semibold text-gray-600">${book.author}</span></p>
+                        </div>
+
+                        <!-- Copies Status & Actions -->
+                        <div class="flex items-center space-x-3 w-full sm:w-auto">
+                            <!-- Copies Status Chip -->
+                            <div class="flex flex-col items-center justify-center w-20 h-10 rounded-full ${isAvailable ? 'bg-green-100' : 'bg-red-100'} p-2 flex-shrink-0">
+                                <span class="text-lg font-extrabold ${isAvailable ? 'text-green-700' : 'text-red-700'}">${book.copies}</span>
+                                <span class="text-xs ${isAvailable ? 'text-green-600' : 'text-red-600'} hidden sm:inline-block">Copies</span>
+                            </div>
+
+                            <div class="flex flex-1 space-x-2">
+                                <!-- Issue Button -->
+                                <button data-id="${book.id}" data-copies="${book.copies}"
+                                    class="issue-btn w-full py-2 px-3 text-xs font-semibold rounded-lg transition duration-150 ease-in-out ${isAvailable ? 'bg-blue-600 hover:bg-blue-700 text-white focus:ring-4 focus:ring-blue-300' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}"
+                                    ${!isAvailable ? 'disabled' : ''}>
+                                    <i data-lucide="scan-line" class="w-4 h-4 inline-block align-text-bottom"></i>
+                                    Issue
+                                </button>
+
+                                <!-- Return Button -->
+                                <button data-id="${book.id}" data-copies="${book.copies}"
+                                    class="return-btn w-full py-2 px-3 text-xs font-semibold rounded-lg transition duration-150 ease-in-out bg-green-500 hover:bg-green-600 text-white focus:ring-4 focus:ring-green-300">
+                                    <i data-lucide="corner-down-left" class="w-4 h-4 inline-block align-text-bottom"></i>
+                                    Return
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                bookListContainer.innerHTML += cardHtml;
+            });
+
+            // Re-render lucide icons after content update
+            lucide.createIcons();
+        }
+
+        // --- INTERACTION LOGIC ---
+
+        function updateCopies(bookId, delta) {
+            let books = loadBooks();
+            const bookIndex = books.findIndex(b => b.id === bookId);
+            
+            if (bookIndex !== -1) {
+                const newCopies = books[bookIndex].copies + delta;
+                if (newCopies >= 0) {
+                    books[bookIndex].copies = newCopies;
+                    saveBooks(books);
+                    renderBooks(); // Rerender UI immediately
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        // 1. Issue Book (Decrement)
+        function issueBook(bookId) {
+            return updateCopies(bookId, -1);
+        }
+
+        // 2. Return Book (Increment)
+        function returnBook(bookId) {
+            return updateCopies(bookId, 1);
+        }
+
+        // 3. Add New Book
+        function addNewBook(title, author, copies) {
+            addBookBtn.textContent = 'Adding...';
+            addBookBtn.disabled = true;
+            
+            let books = loadBooks();
+            
+            const newBook = {
+                id: Date.now().toString() + Math.random().toString(16).substring(2), // Simple unique ID
+                title: title,
+                author: author,
+                copies: copies
+            };
+            
+            books.push(newBook);
+            saveBooks(books);
+            renderBooks(); // Rerender UI immediately
+
+            // Reset form fields
+            document.getElementById('new-title').value = '';
+            document.getElementById('new-author').value = '';
+            document.getElementById('new-copies').value = '1';
+
+            addBookBtn.textContent = 'Add to Shelf';
+            addBookBtn.disabled = false;
+        }
+
+        // --- EVENT LISTENERS ---
+
+        // Event delegation for Issue and Return buttons
+        bookListContainer.addEventListener('click', (event) => {
+            const button = event.target.closest('button');
+            if (!button || button.disabled) return;
+            
+            const bookId = button.getAttribute('data-id');
+            
+            // Temporarily disable button to prevent rapid clicks
+            const originalText = button.innerHTML;
+            button.disabled = true;
+            button.innerHTML = '<div class="spinner border-2 border-solid border-white border-t-2 rounded-full w-4 h-4"></div>'; 
+
+            let success = false;
+            
+            if (button.classList.contains('issue-btn')) {
+                success = issueBook(bookId);
+            } else if (button.classList.contains('return-btn')) {
+                success = returnBook(bookId);
+            }
+
+            // After a short delay to show spinner (simulate network activity)
+            setTimeout(() => {
+                // The renderBooks call inside issue/return handles the final UI update.
+                // Re-enable button after action, regardless of success (unless disabled by render)
+                button.disabled = false;
+                button.innerHTML = originalText;
+                lucide.createIcons(); 
+            }, 150);
+        });
+
+        // Event listener for Add New Book form submission
+        addBookForm.addEventListener('submit', (event) => {
+            event.preventDefault();
+            
+            const title = document.getElementById('new-title').value.trim();
+            const author = document.getElementById('new-author').value.trim();
+            const copies = parseInt(document.getElementById('new-copies').value, 10);
+            
+            if (title && author && copies >= 1) {
+                addNewBook(title, author, copies);
+            } else {
+                console.error("Please fill out all fields correctly (Copies must be >= 1).");
+            }
+        });
+
+        // Start the application setup
+        checkAndSeedData();
+    </script>
+</body>
+</html>
