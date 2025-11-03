@@ -14,14 +14,14 @@
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #e2e8f0; /* Subtle blue-gray background */
+            background-color: #f2f4f5; /* Subtle blue-gray background */
         }
         /* Custom scrollbar for aesthetics */
         .book-list::-webkit-scrollbar {
             width: 8px;
         }
         .book-list::-webkit-scrollbar-thumb {
-            background-color: #94a3b8; /* Slate 400 */
+            background-color: #97a3b4; /* Slate 400 */
             border-radius: 4px;
         }
         .book-list::-webkit-scrollbar-track {
@@ -29,9 +29,10 @@
         }
         /* Styles for the loading indicator and button spinner */
         .spinner {
-            border-top-color: #3b82f6;
+            border-top-color: #3581fa;
             -webkit-animation: spinner 1s linear infinite;
             animation: spinner 1s linear infinite;
+
         }
         /* Override for button spinner to ensure visibility on button background */
         button .spinner {
@@ -210,7 +211,7 @@
 
                                 <!-- Return Button -->
                                 <button data-id="${book.id}" data-copies="${book.copies}"
-                                    class="return-btn w-full py-2 px-3 text-xs font-semibold rounded-lg transition duration-150 ease-in-out bg-green-500 hover:bg-green-600 text-white focus:ring-4 focus:ring-green-300">
+                                    class="return-btn w-full py-2 px-3 text-xs font-semibold rounded-lg transition duration-150 ease-in-out bg-yellow-300 hover:bg-green-600 text-white focus:ring-4 focus:ring-green-300">
                                     <i data-lucide="corner-down-left" class="w-4 h-4 inline-block align-text-bottom"></i>
                                     Return
                                 </button>
